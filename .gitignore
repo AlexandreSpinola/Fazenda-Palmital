@@ -1,0 +1,25 @@
+# Ambiente virtual
+venv/
+__pycache__/
+*.pyc
+
+# Modelos e vídeos pesados
+*.pt
+*.mp4
+*.avi
+*.mkv
+
+# Dados brutos e frames (muito grandes para o git)
+frames/
+frames_anotacao_v2/
+gravações/
+lote_cvat/
+dataset_v2/
+CVAT jobs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Sistema
+.DS_Store
+Thumbs.db
