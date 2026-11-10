@@ -15,10 +15,15 @@ O notebook tem RTX 3050 e 24 GB de RAM.
 1. **Driver NVIDIA atualizado.** O PyTorch com CUDA 13 exige driver ≥ 580.
    Confira com `nvidia-smi`, que mostra a versão do driver no topo.
 2. **Python 3.14:** `winget install Python.Python.3.14`
-3. **Copiar o projeto** pelo pen drive ou pelo git. Basta a pasta
-   `Fazenda-Palmital` **sem** `Gravações/`, `lotes/` e `resultados/`, mas
-   **com** `modelos/yoloe-vaca.pt` (70 MB). Para comparar, copie também
-   `Colega/best.pt`.
+3. **Código pelo git**, numa pasta nova (ex. `C:\Fazenda`):
+   ```powershell
+   git clone -b reestruturacao-pipeline https://github.com/AlexandreSpinola/Fazenda-Palmital.git
+   ```
+   **Do pen drive (`D:\Fazenda\`)**, copie:
+   - `para_notebook\yoloe-vaca.pt` → `Fazenda-Palmital\modelos\`
+   - `best.pt` (modelo da colega) → `Colega\best.pt`, ao lado de `Fazenda-Palmital`
+   - `para_notebook\...Ch.1...2026-10-01-05-00-23.mp4` (2 h de vídeo, para o
+     teste sem internet; **não renomeie**, porque o horário vem do nome)
 4. **Ambiente** (na pasta acima de `Fazenda-Palmital`):
    ```powershell
    winget install Microsoft.VCRedist.2015+.x64
@@ -77,9 +82,14 @@ visível). Anote cada vez que elas **entram e saem** do cocho:
 Isso dá para comparar ocupação e visitas do script (e do modelo da colega)
 com a realidade.
 
-### 4. Copiar vídeos do NVR para o pen drive (64 GB)
+### 4. Copiar vídeos do NVR para o pen drive
+- O pen drive tem **32 GB** (~27 GB livres) e está em **FAT32**, que **não
+  aceita arquivos maiores que 4 GB**. Um dia inteiro de uma câmera tem ~5,3 GB.
+  Na exportação do NVR, **escolha períodos de até ~12 h por arquivo** (ex.
+  00:00–12:00 e 12:00–24:00), ou o NVR pode falhar ou cortar o arquivo.
 - Pela porta USB do NVR: Backup → selecionar canais 1 e 2 → período.
-- Cerca de **10,6 GB por dia** (2 câmeras), então cabem **~5 dias**.
+- Cerca de **10,6 GB por dia** (2 câmeras), então cabem **~2,5 dias**. Se der,
+  leve também o HD externo.
 - Priorize **variedade**: dias diferentes da semana, um dia de chuva se houver,
   e o próprio dia da visita (para casar com o gabarito).
 
