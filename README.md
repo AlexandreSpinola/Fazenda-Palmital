@@ -20,7 +20,9 @@ câmeras (1 fps) → NVR (.dav) → HD externo → lote pré-anotado (YOLOE) →
 | `contar_visitas.py` | vídeo `.dav` ou câmera ao vivo (RTSP) → visitas ao cocho e ocupação por minuto |
 | `gerar_lote_cvat.py` | `.dav` → lote de frames com vaca + pré-anotações para o CVAT |
 | `enviar_lote_cvat.py` | envia um lote para o CVAT local (projeto, task, pré-anotações, jobs) |
+| `testar_camera.py` | testa o RTSP das câmeras e salva uma foto com linhas de referência |
 | `comum.py` | leitura de vídeo/RTSP e carregamento de modelo, usados pelos scripts |
+| `kit/` | atalhos `.bat` e LEIA-ME do kit portátil (pen drive) |
 | `rastreador.yaml` | configuração do rastreador (ByteTrack ajustado para 1 fps) |
 | `requirements.txt` | dependências (o PyTorch com CUDA é instalado à parte, veja abaixo) |
 | `CONTEXT.md` | contexto, decisões de arquitetura e roadmap |
@@ -107,6 +109,54 @@ lotes/lote_002/
 4. **Corrigir** frame a frame (regras abaixo) e marcar o job como concluído.
 5. **Exportar**: *Export task dataset* → formato **Ultralytics YOLO Segmentation**.
 
+### Acesso dos bolsistas ao CVAT
+
+O CVAT roda nesta máquina (`http://100.84.211.55:8080`) e **só é acessível
+pela rede do Tailscale**: o firewall bloqueia a porta 8080 para qualquer outra
+origem. Os bolsistas **não** recebem usuário do Windows nem do RustDesk.
+
+**Do lado do bolsista** (uma vez):
+1. Criar uma conta no Tailscale com **Gmail pessoal**, não o e-mail da UFLA
+   (https://login.tailscale.com), e instalar o app no computador
+   (https://tailscale.com/download).
+2. Aceitar o convite de compartilhamento que vai chegar por e-mail (passo 1 do
+   administrador, abaixo).
+3. Com o Tailscale ligado, abrir **http://100.84.211.55:8080** no Chrome,
+   clicar em **Create an account** e mandar o **nome de usuário** criado para você.
+
+**Do seu lado** (por bolsista):
+1. **Compartilhar a máquina**: painel do Tailscale → *Machines* → `alienware-gedai`
+   → **⋯ → Share** → e-mail do bolsista. Compartilhar não ocupa vaga de usuário
+   do plano gratuito, e o bolsista só enxerga esta máquina.
+2. **Papel no CVAT**: http://100.84.211.55:8080/admin → *Users* → usuário →
+   em *Groups*, deixar **só `worker`**. Assim ele só vê os jobs atribuídos a ele.
+3. **Atribuir jobs**: ao enviar um lote, `--responsaveis usuario1,usuario2`; ou
+   no CVAT, na task, mudar o *Assignee* de cada job.
+
+**Restringir o bolsista ao CVAT** (recomendado, uma vez): no painel do
+Tailscale → **Access controls**, substitua a política por:
+
+```json
+{
+  "hosts": {
+    "laboratorio": "100.84.211.55"
+  },
+  "grants": [
+    // você e os membros da sua rede: acesso a tudo
+    {"src": ["autogroup:member"], "dst": ["*"], "ip": ["*"]},
+    // bolsistas (máquina compartilhada com eles): só o CVAT
+    {"src": ["autogroup:shared"], "dst": ["laboratorio"], "ip": ["tcp:8080"]}
+  ]
+}
+```
+
+Teste com o primeiro bolsista: o CVAT deve abrir, e o RustDesk
+(`100.84.211.55`, porta 21118) **não** deve conectar.
+
+**Para o CVAT estar no ar**, a máquina precisa estar **ligada e com o Windows
+logado**: o Docker só inicia após o login. Depois de uma reinicialização, entre
+pelo RustDesk e aguarde 1–2 min.
+
 **Regras de anotação** (para os estudantes):
 - Anotar **toda vaca visível**, inclusive as cortadas na borda e as que só
   mostram a cabeça.
@@ -155,6 +205,27 @@ Saída em `resultados/<camera>_<data>/`:
   manual.
 
 Velocidade: ~2 min por hora de vídeo na RTX 5070.
+
+### Kit portátil (pen drive)
+
+Para rodar o `contar_visitas.py` num PC sem nada instalado (por exemplo o da
+fazenda), há um kit com Python portátil e PyTorch **CPU** (~1,3 GB). Os atalhos
+`.bat` e o LEIA-ME estão em [kit/](kit/). Para remontar o kit:
+
+1. Baixar o Python *embeddable* da mesma versão do venv
+   (`python-3.14.x-embed-amd64.zip`, python.org) e extrair em `KIT\python\`.
+2. Trocar o `python314._pth` por estas linhas:
+   `python314.zip`, `.`, `Lib\site-packages`, `..\app`, `import site`.
+3. `..\venv\Scripts\python -m pip install --target KIT\python\Lib\site-packages torch==2.14.1 torchvision==0.29.1 ultralytics==8.4.183 opencv-python==5.0.0.93 av==19.0.1 lap==0.5.14 tqdm numpy`
+   (no PyPI, o torch para Windows é a versão CPU).
+4. Copiar `msvcp140*.dll`, `concrt140.dll` e `vcomp140.dll` de `C:\Windows\System32`
+   para `KIT\python\`, e o `vc_redist.x64.exe` para `KIT\extras\`.
+5. `KIT\app\`: `comum.py`, `contar_visitas.py`, `testar_camera.py`,
+   `rastreador.yaml`, e `modelos\yoloe-vaca.pt` + `modelos\colega.pt`.
+6. `KIT\`: os `.bat` e o LEIA-ME de `kit/`; `KIT\videos\`: um `.mp4` para o teste.
+
+Velocidade na CPU (4 núcleos de um Core Ultra 9): YOLOE ~150 ms/frame, modelo da
+colega ~20 ms/frame.
 
 ## 6. Próximas etapas (ainda não implementadas)
 
