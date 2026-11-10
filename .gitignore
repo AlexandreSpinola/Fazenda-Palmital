@@ -5,14 +5,24 @@ __pycache__/
 
 # Modelos e vídeos pesados
 *.pt
+*.ts
+*.onnx
+*.dav
 *.mp4
 *.avi
 *.mkv
 
-# Dados brutos e frames (muito grandes para o git)
+# Dados (muito grandes para o git)
+gravações/
+lotes/
+resultados/
+runs/
+datasets/
+*.zip
+
+# Pastas do fluxo antigo (ver legado/)
 frames/
 frames_anotacao_v2/
-gravações/
 lote_cvat/
 dataset_v2/
 CVAT jobs/

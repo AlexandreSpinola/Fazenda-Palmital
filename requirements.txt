@@ -1,0 +1,13 @@
+# Instalar o PyTorch PRIMEIRO, com CUDA (a RTX 5070 / Blackwell exige CUDA >= 12.8):
+#   pip install torch==2.14.1 torchvision==0.29.1 --index-url https://download.pytorch.org/whl/cu130
+# Depois:
+#   pip install -r requirements.txt
+# No Windows o PyTorch precisa do Visual C++ Redistributable:
+#   winget install Microsoft.VCRedist.2015+.x64
+ultralytics==8.4.183
+opencv-python==5.0.0.93
+av==19.0.1
+numpy==2.5.2
+tqdm==4.70.1
+lap==0.5.14       # usado pelo rastreador (ByteTrack)
+cvat-sdk==2.80.0  # mesma versao do servidor CVAT

@@ -1,67 +1,174 @@
-# Visão Computacional — GEDAI (identificação de vacas no cocho)
+# Vacas no Cocho — GEDAI (Fazenda Palmital)
 
-Pipeline: câmeras Intelbras (zenital, 90°) → vídeos do NVR → frames →
-anotação no CVAT → conversão → treino no Colab → modelos.
+Visão computacional para medir **quantas vezes cada vaca vai ao cocho, quanto
+tempo fica** e a **taxa de ocupação do cocho**, a partir das câmeras
+Intelbras zenitais.
 
-## Fluxo de trabalho
+> O **porquê** de cada escolha (fatos levantados, decisões, fases, perguntas
+> em aberto) está em [CONTEXT.md](CONTEXT.md). Este README é o **como usar**.
 
-1. **Baixar vídeos** pelo app da Intelbras para `gravações\`
-2. **Extrair frames** (1 a cada 15 s; registra no log `videos_processados.csv`
-   e pula vídeos já processados — depois disso o vídeo pode ser apagado):
-   ```
-   venv\Scripts\python extrair_frames.py "gravações\VIDEO.avi" --intervalo 15 --saida lote_cvat
-   ```
-3. **Anotar no CVAT** ([app.cvat.ai](https://app.cvat.ai)), projeto com rótulo
-   `vaca` (retângulo) e atributos: `identidade` (select), `comendo` (checkbox),
-   `posicao` (esquerda/centro/direita). Uma task por vídeo/lote.
-4. **Exportar** a task no formato "CVAT for images 1.1" (sem imagens) e
-   **converter** (gera dataset YOLO + recortes por identidade + recortes
-   comendo + estatísticas de cobertura):
-   ```
-   venv\Scripts\python converter_anotacoes.py "CVAT jobs\EXPORT\annotations.xml" --imagens frames --saida dataset_vX
-   ```
-5. **Treinar no Colab** (GPU T4 gratuita): subir `treinar_detector_colab.ipynb`
-   + o zip do `dataset_yolo`, rodar as células, baixar o `best.pt`.
-6. **Testar localmente**:
-   ```
-   venv\Scripts\python testar_detector.py "gravações\VIDEO.avi"
-   venv\Scripts\python gerar_video_demo.py "gravações\VIDEO.avi" --saida demo.mp4
-   ```
+```
+câmeras (1 fps) → NVR (.dav) → HD externo → lote pré-anotado (YOLOE) → CVAT (correção humana)
+   → treino do segmentador (RTX 5070) → rastreamento → re-ID por clusters → visitas por vaca
+   → [futuro] o mesmo pipeline ao vivo na fazenda via RTSP
+```
 
-## Arquivos e pastas
+## Estrutura
 
 | Item | O que é |
 |---|---|
-| `extrair_frames.py` | vídeo → JPGs a cada N segundos (+ log CSV) |
-| `converter_anotacoes.py` | XML do CVAT → dataset YOLO + recortes |
-| `treinar_detector_colab.ipynb` | notebook de fine-tuning no Colab |
-| `testar_detector.py` | roda o modelo num vídeo, ao vivo na tela |
-| `gerar_video_demo.py` | gera vídeo com detecções desenhadas |
-| `detector_vacas_v1.pt` | **modelo v1** (96 imagens, 13/08/2026) |
-| `yolo11n.pt` | modelo base pré-treinado (ponto de partida dos treinos) |
-| `demo_detector_h264.mp4` | vídeo demo (H.264, abre em qualquer player) |
-| `frames\` | 874 frames do vídeo 11/ago 16h (estão no CVAT — não apagar) |
-| `frames_anotacao_v2\` | 322 frames variados (madrugada/manhã/tarde) p/ anotação |
-| `lote_cvat\` | frames extraídos a cada 15 s (lotes novos) |
-| `dataset_v2\` | dataset convertido do 1º ciclo (96 imgs anotadas) |
-| `CVAT jobs\` | exports (XML) baixados do CVAT |
-| `videos_processados.csv` | log dos vídeos já transformados em frames |
+| `contar_visitas.py` | vídeo `.dav` ou câmera ao vivo (RTSP) → visitas ao cocho e ocupação por minuto |
+| `gerar_lote_cvat.py` | `.dav` → lote de frames com vaca + pré-anotações para o CVAT |
+| `enviar_lote_cvat.py` | envia um lote para o CVAT local (projeto, task, pré-anotações, jobs) |
+| `comum.py` | leitura de vídeo/RTSP e carregamento de modelo, usados pelos scripts |
+| `rastreador.yaml` | configuração do rastreador (ByteTrack ajustado para 1 fps) |
+| `requirements.txt` | dependências (o PyTorch com CUDA é instalado à parte, veja abaixo) |
+| `CONTEXT.md` | contexto, decisões de arquitetura e roadmap |
+| `modelos/` | pesos dos modelos (`yoloe-vaca.pt` é criado automaticamente) |
+| `Gravações/` | vídeos `.dav` trazidos da fazenda (fora do git) |
+| `lotes/` | lotes gerados para anotação (fora do git) |
+| `legado/` | scripts do fluxo antigo (detecção por caixa, treino no Colab), mantidos só como referência |
+| `apresentacao_projeto.html` | apresentação da versão anterior do projeto |
 
-## Roadmap dos modelos
+> ⚠️ **Esta pasta está dentro do OneDrive.** Vídeos têm ~5 GB por câmera por
+> dia, e os lotes, centenas de MB. Mantenha os dados pesados **fora do
+> OneDrive** (HD externo ou `C:\dados_fazenda`) e aponte os scripts para lá.
 
-1. **Detecção** (`vaca` no frame) — ✅ v1 treinada, mAP alto no vídeo diurno;
-   falta robustez noturna e mais vacas → escalar anotação
-2. **Identificação individual** (qual vaca, pelo padrão de manchas) — usa
-   `recortes_identidade\`; requer cada vaca em esquerda/centro/direita,
-   dia e noite
-3. **Comportamento** (comendo ou não) — usa `recortes_comendo\`; hoje há
-   só 4 exemplos "não comendo", priorizar na anotação
-4. **Visitas ao cocho** — juntar rastreamento + identidade + comendo em
-   eventos (vaca, início, duração) e gerar relatórios
+## 1. Ambiente (uma vez)
+
+O venv fica em `..\venv` (pasta `Fazenda\venv`). Python 3.14.
+
+```powershell
+# o PyTorch precisa do Visual C++ Redistributable
+winget install Microsoft.VCRedist.2015+.x64
+
+# PyTorch com CUDA 13.0 (a RTX 5070 exige CUDA >= 12.8)
+..\venv\Scripts\python -m pip install torch==2.14.1 torchvision==0.29.1 --index-url https://download.pytorch.org/whl/cu130
+..\venv\Scripts\python -m pip install -r requirements.txt
+
+# conferir: deve imprimir True e o nome da placa
+..\venv\Scripts\python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+```
+
+## 2. Trazer os vídeos da fazenda
+
+Exportar do NVR (porta USB do NVD 1416 ou pela rede local da fazenda) para o
+HD externo. Os arquivos saem como
+`192.168.10.66-Ch.<canal>-VIP Intelbras-<AAAA-MM-DD-hh-mm-ss>.dav`. **Não
+renomeie**: o script tira do nome a câmera e o horário de início.
+
+Para o dataset, priorize **variedade**: dias diferentes, todas as câmeras,
+madrugada/dia/noite, cocho cheio e vazio, chuva.
+
+## 3. Gerar um lote pré-anotado
+
+```powershell
+..\venv\Scripts\python gerar_lote_cvat.py "Gravações\*.dav" --saida lotes\lote_002 --previews
+```
+
+O que o script faz com cada vídeo:
+1. pega 1 frame a cada 30 s de vídeo;
+2. segmenta as vacas e descarta os frames vazios;
+3. escolhe até 150 frames espalhados pelas horas do dia.
+
+Leva ~1min45s por câmera-dia na RTX 5070. Na 1ª execução, baixa o modelo
+(~700 MB) uma única vez.
+
+| Opção | Padrão | Para quê |
+|---|---|---|
+| `--intervalo` | 30 | segundos de vídeo entre frames candidatos |
+| `--max-por-video` | 150 | frames selecionados por vídeo |
+| `--min-vacas` | 1 | descarta frames com menos vacas que isso |
+| `--conf` | 0.15 | confiança mínima. É baixa de propósito: apagar um falso positivo é mais rápido que desenhar uma vaca |
+| `--modelo` | YOLOE "cow" | depois do 1º treino, passe o seu `best.pt` aqui |
+| `--previews` | — | salva as imagens com os polígonos desenhados, para conferência rápida |
+
+Saída:
+
+```
+lotes/lote_002/
+  imagens/              frames selecionados (ch00_2026-10-01_14-00-52.jpg ...)
+  imagens.zip           para criar a task no CVAT
+  anotacoes_cvat.zip    pré-anotações (formato CVAT for images 1.1)
+  frames.csv            índice: imagem, vídeo, câmera, data/hora, nº de vacas
+  previews/             (com --previews)
+```
+
+**`lotes/lote_001`** já foi gerado com os vídeos de 01/10/2026 (canais 0 e 1):
+300 imagens e 547 vacas pré-anotadas.
+
+## 4. Corrigir no CVAT
+
+1. **Projeto** (uma vez): um único rótulo `vaca`, tipo **Polygon**, sem atributos.
+   A identidade da vaca **não** é anotada no CVAT; ela vem dos clusters (fase 3).
+2. **Task**: *Create task* → projeto acima → enviar o `imagens.zip`.
+3. **Pré-anotações**: na task, *Actions → Upload annotations* → formato
+   **CVAT 1.1** → `anotacoes_cvat.zip`.
+4. **Corrigir** frame a frame (regras abaixo) e marcar o job como concluído.
+5. **Exportar**: *Export task dataset* → formato **Ultralytics YOLO Segmentation**.
+
+**Regras de anotação** (para os estudantes):
+- Anotar **toda vaca visível**, inclusive as cortadas na borda e as que só
+  mostram a cabeça.
+- O polígono cobre **cabeça + corpo**, passando por cima da barra do cocho.
+- Vaca atrás de outra: anotar **só a parte visível**, sem invadir a vizinha.
+- Corrigir os erros típicos do pré-anotador:
+  - **vaca preta não detectada**: desenhar;
+  - **um polígono cobrindo duas vacas**: separar;
+  - **sombra ou pedaço de cocho marcado como vaca**: apagar.
+- Na dúvida se é uma vaca ou duas, olhar o frame anterior e o seguinte.
+
+## 5. Contar visitas e ocupação do cocho
+
+```powershell
+# vídeo gravado (dá para limitar o horário)
+..\venv\Scripts\python contar_visitas.py "Gravações\VIDEO.dav" --inicio 05:00 --fim 07:00 --video
+
+# câmera ao vivo (só na rede da fazenda); q fecha a janela, Ctrl+C encerra salvando
+..\venv\Scripts\python contar_visitas.py "rtsp://admin:SENHA@192.168.10.66:554/cam/realmonitor?channel=1&subtype=1" --mostrar
+
+# mesmo vídeo com o modelo da colega, para comparar
+..\venv\Scripts\python contar_visitas.py "Gravações\VIDEO.dav" --modelo ..\Colega\best.pt
+```
+
+Como funciona:
+1. Detecta e **rastreia** as vacas, 1 frame por segundo.
+2. Considera **"no cocho"** a vaca cuja cabeça passou da barra: o topo da caixa
+   fica acima de `--linha` (0,40 da altura da imagem nas câmeras ch00 e ch01).
+3. Uma **visita** termina quando a vaca fica mais de `--tolerancia` segundos
+   (padrão 60) fora do cocho.
+
+As visitas são **anônimas**; a identidade vem com o re-ID (fase 3).
+
+Saída em `resultados/<camera>_<data>/`:
+- `visitas.csv`: uma visita por linha;
+- `ocupacao.csv`: vacas por minuto;
+- `deteccoes.csv`: tudo, para reprocessar;
+- `video.mp4` (com `--video`);
+- `recortes/` (com `--recortes 30`): recorte de cada vaca a cada 30 s, matéria-prima dos clusters.
+
+**Confiabilidade** (teste em 01/10, ch01, 5h30–6h30):
+- a **ocupação é robusta**: o tempo total de cocho variou só 2–8% entre modelos e configurações;
+- **onde uma visita começa e termina ainda é incerto**: há fragmentação quando o
+  rastreador perde a vaca, e o `--tolerancia` é uma decisão zootécnica
+  (critério de intervalo entre refeições). Falta validar contra uma contagem
+  manual.
+
+Velocidade: ~2 min por hora de vídeo na RTX 5070.
+
+## 6. Próximas etapas (ainda não implementadas)
+
+- **Treino do segmentador** (YOLO-seg na RTX 5070) com o export do CVAT, e depois
+  usar o `best.pt` em `--modelo` para pré-anotar os lotes seguintes.
+- **Re-ID** (embeddings + clusters + galeria) a partir dos `recortes/`, usando
+  as 89 fotos nomeadas (31 vacas × esquerda/centro/direita) como galeria
+  inicial. Ver as fases em [CONTEXT.md](CONTEXT.md).
 
 ## Referências
 
 - RTSP das câmeras (só funciona na rede da fazenda ou via VPN):
   `rtsp://admin:SENHA@192.168.10.66:554/cam/realmonitor?channel=1&subtype=1`
-- NVR: Intelbras NVD 1416, acesso remoto via nuvem (SIM Next), P2P sem RTSP
-- Anotação: https://app.cvat.ai — organização GEDAI, papel Worker p/ estudantes
+- NVR: Intelbras NVD 1416 (16 canais). Acesso remoto atual pelo SIM Next
+  (nuvem P2P, sem RTSP e lento para baixar vídeo).
+- CVAT na nuvem (provisório): https://app.cvat.ai, organização GEDAI, com papel
+  *Worker* para os estudantes.

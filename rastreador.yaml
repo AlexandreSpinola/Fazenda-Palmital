@@ -1,0 +1,14 @@
+# ByteTrack ajustado para as cameras do cocho (1 frame por segundo).
+# O rastreador conta o tempo em FRAMES PROCESSADOS: com --intervalo 1,
+# track_buffer 60 = uma vaca escondida mantem o mesmo ID por ate 60 s.
+# match_thresh 0.9 (padrao 0.8) aceita mais deslocamento entre frames: as
+# caixas das vacas no cocho variam muito de um frame para o outro.
+# Testado em 01/10 ch01 05:30-06:30: vida mediana de um ID passou de 38 s
+# para 198 s e o numero de IDs caiu pela metade.
+tracker_type: bytetrack
+track_high_thresh: 0.25
+track_low_thresh: 0.1
+new_track_thresh: 0.25
+track_buffer: 60
+match_thresh: 0.9
+fuse_score: True
