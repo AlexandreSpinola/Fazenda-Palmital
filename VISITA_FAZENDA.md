@@ -6,6 +6,15 @@ Objetivos:
 3. Trazer **mais vídeos** no pen drive.
 4. Levantar as pendências do projeto.
 
+**Plano A: kit do pen drive** (`D:\Fazenda\KIT_FAZENDA`). Roda em qualquer
+Windows sem instalar nada, sem internet e sem placa de vídeo. Clique duas vezes
+em `1_TESTAR_KIT.bat`, depois `2_TESTAR_CAMERAS.bat`, depois
+`3_CONTAR_AO_VIVO.bat`. Instruções em `LEIA-ME.html`, dentro do kit.
+Testado em 10/11: 5 min de vídeo processados em ~1 min só com a CPU.
+
+**Plano B: notebook** (RTX 3050), preparado como na seção A. Use-o se o kit
+não rodar no PC da fazenda (por exemplo, por bloqueio do Smart App Control).
+
 ---
 
 ## A. Preparar o notebook (antes de sair; precisa de internet)
@@ -22,8 +31,8 @@ O notebook tem RTX 3050 e 24 GB de RAM.
    **Do pen drive (`D:\Fazenda\`)**, copie:
    - `para_notebook\yoloe-vaca.pt` → `Fazenda-Palmital\modelos\`
    - `best.pt` (modelo da colega) → `Colega\best.pt`, ao lado de `Fazenda-Palmital`
-   - `para_notebook\...Ch.1...2026-10-01-05-00-23.mp4` (2 h de vídeo, para o
-     teste sem internet; **não renomeie**, porque o horário vem do nome)
+   - `KIT_FAZENDA\videos\...Ch.1...2026-10-01-05-00-23.mp4` (2 h de vídeo,
+     para o teste sem internet; **não renomeie**, porque o horário vem do nome)
 4. **Ambiente** (na pasta acima de `Fazenda-Palmital`):
    ```powershell
    winget install Microsoft.VCRedist.2015+.x64
@@ -88,8 +97,11 @@ com a realidade.
   Na exportação do NVR, **escolha períodos de até ~12 h por arquivo** (ex.
   00:00–12:00 e 12:00–24:00), ou o NVR pode falhar ou cortar o arquivo.
 - Pela porta USB do NVR: Backup → selecionar canais 1 e 2 → período.
-- Cerca de **10,6 GB por dia** (2 câmeras), então cabem **~2,5 dias**. Se der,
-  leve também o HD externo.
+- Cerca de **10,6 GB por dia** (2 câmeras). Com o kit ocupando ~2 GB, sobram
+  ~25 GB, ou **~2 dias**. Se der, leve também o HD externo.
+- O pen drive grava a **~7 MB/s**: cada dia das duas câmeras leva **~30 min**
+  para copiar, ou mais se a porta USB do NVR for lenta. **Comece a exportação
+  logo que chegar** e rode o contador enquanto isso.
 - Priorize **variedade**: dias diferentes da semana, um dia de chuva se houver,
   e o próprio dia da visita (para casar com o gabarito).
 
